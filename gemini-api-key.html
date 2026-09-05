@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Api Key Server</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #edf2ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    [hidden] { display: none !important; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(111, 76, 255, .22), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(23, 193, 178, .16), transparent 35%),
+        #0b1020;
+    }
+
+    main {
+      width: min(100%, 480px);
+      padding: 32px;
+      border: 1px solid #273252;
+      border-radius: 20px;
+      background: rgba(18, 25, 45, .92);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .35);
+    }
+
+    h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 5vw, 2.2rem); }
+    .intro { margin: 0 0 26px; color: #aeb9d6; line-height: 1.55; }
+    label { display: block; margin-bottom: 9px; font-weight: 700; }
+
+    .field {
+      display: flex;
+      overflow: hidden;
+      border: 1px solid #39476d;
+      border-radius: 12px;
+      background: #0d1428;
+    }
+
+    input {
+      min-width: 0;
+      flex: 1;
+      padding: 14px;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: #fff;
+      font: inherit;
+    }
+
+    input:focus-visible { box-shadow: inset 0 0 0 2px #8c7dff; }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: #fff;
+      background: #6554e8;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { filter: brightness(1.1); }
+    button:focus-visible { outline: 3px solid #b8afff; outline-offset: 2px; }
+    .reveal { border-radius: 0; background: #202c4b; }
+
+    .actions { display: flex; gap: 10px; margin-top: 16px; }
+    .danger { background: #a43f55; }
+
+    .notice {
+      margin-top: 22px;
+      padding: 13px 14px;
+      border-left: 3px solid #f1b44c;
+      border-radius: 6px;
+      background: rgba(241, 180, 76, .08);
+      color: #d7dced;
+      font-size: .9rem;
+      line-height: 1.5;
+    }
+
+    #status { min-height: 1.5em; margin: 14px 0 0; color: #7ee0c8; }
+
+    #savedKeyPanel {
+      display: none;
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #39476d;
+      border-radius: 10px;
+      background: #0d1428;
+    }
+
+    #savedKeyPanel.visible { display: block; }
+    #savedKeyPanel strong { display: block; margin-bottom: 7px; }
+    #savedKey {
+      display: block;
+      overflow-wrap: anywhere;
+      color: #b8afff;
+      user-select: all;
+    }
+
+    .pin-card {
+      width: min(100%, 420px);
+      padding: 30px;
+      border: 1px solid #273252;
+      border-radius: 20px;
+      background: rgba(18, 25, 45, .96);
+      box-shadow: 0 24px 70px rgba(0, 0, 0, .45);
+    }
+
+    .pin-card h1 { margin-bottom: 8px; }
+    .pin-card input {
+      width: 100%;
+      margin: 12px 0 14px;
+      border: 1px solid #39476d;
+      border-radius: 12px;
+      background: #0d1428;
+    }
+
+    .error { min-height: 1.5em; margin: 12px 0 0; color: #ff91a8; }
+    .secondary { background: #202c4b; }
+    .top-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+  <section class="pin-card" id="pinGate">
+    <h1 id="pinTitle">Unlock Api Key Server</h1>
+    <p class="intro" id="pinHelp">Enter your PIN to continue.</p>
+    <form id="pinForm">
+      <label for="pinInput">PIN</label>
+      <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" minlength="4" placeholder="At least 4 characters" required>
+      <button id="pinSubmit" type="submit">Unlock</button>
+    </form>
+    <p class="error" id="pinError" role="alert" aria-live="assertive"></p>
+  </section>
+
+  <main id="app" hidden>
+    <div class="top-actions">
+      <button class="secondary" id="changePin" type="button">Change PIN</button>
+      <button class="secondary" id="lockPage" type="button">Lock</button>
+    </div>
+    <h1>Api Key Server</h1>
+    <p class="intro">Save a key for local experiments on this device.</p>
+
+    <form id="keyForm">
+      <label for="apiKey">API key</label>
+      <div class="field">
+        <input id="apiKey" name="apiKey" type="password" placeholder="Paste your Gemini API key" autocomplete="off" spellcheck="false" required>
+        <button class="reveal" id="toggleKey" type="button" aria-label="Show API key">Show</button>
+      </div>
+      <div class="actions">
+        <button type="submit">Save key</button>
+        <button class="danger" id="removeKey" type="button">Remove</button>
+      </div>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+    <div id="savedKeyPanel">
+      <strong>Saved key</strong>
+      <code id="savedKey"></code>
+    </div>
+    <div class="notice"><strong>Security note:</strong> this stores the key in your browser's local storage. Use it only for private local testing—never on a public or shared website. Production apps should keep API keys on a server.</div>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "gemini_api_key";
+    const PIN_KEY = "api_key_server_pin_hash";
+    const pinGate = document.querySelector("#pinGate");
+    const pinForm = document.querySelector("#pinForm");
+    const pinInput = document.querySelector("#pinInput");
+    const pinTitle = document.querySelector("#pinTitle");
+    const pinHelp = document.querySelector("#pinHelp");
+    const pinSubmit = document.querySelector("#pinSubmit");
+    const pinError = document.querySelector("#pinError");
+    const app = document.querySelector("#app");
+    const form = document.querySelector("#keyForm");
+    const input = document.querySelector("#apiKey");
+    const toggle = document.querySelector("#toggleKey");
+    const remove = document.querySelector("#removeKey");
+    const status = document.querySelector("#status");
+    const savedKeyPanel = document.querySelector("#savedKeyPanel");
+    const savedKeyText = document.querySelector("#savedKey");
+    const lockPage = document.querySelector("#lockPage");
+    const changePin = document.querySelector("#changePin");
+
+    async function hashPin(pin) {
+      const bytes = new TextEncoder().encode(pin);
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+
+    function configurePinGate() {
+      const creating = !localStorage.getItem(PIN_KEY);
+      pinTitle.textContent = creating ? "Create a PIN" : "Unlock Api Key Server";
+      pinHelp.textContent = creating
+        ? "Create a PIN with at least 4 characters. You will need it to open this page."
+        : "Enter your PIN to continue.";
+      pinSubmit.textContent = creating ? "Create PIN" : "Unlock";
+      pinInput.value = "";
+      pinError.textContent = "";
+      setTimeout(() => pinInput.focus(), 0);
+    }
+
+    function unlock() {
+      pinGate.hidden = true;
+      app.hidden = false;
+    }
+
+    function lock() {
+      app.hidden = true;
+      pinGate.hidden = false;
+      configurePinGate();
+    }
+
+    pinForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const pin = pinInput.value;
+      if (pin.length < 4) {
+        pinError.textContent = "PIN must contain at least 4 characters.";
+        return;
+      }
+
+      const enteredHash = await hashPin(pin);
+      const storedHash = localStorage.getItem(PIN_KEY);
+      if (!storedHash) {
+        localStorage.setItem(PIN_KEY, enteredHash);
+        unlock();
+      } else if (enteredHash === storedHash) {
+        unlock();
+      } else {
+        pinError.textContent = "Incorrect PIN. Please try again.";
+        pinInput.select();
+      }
+    });
+
+    lockPage.addEventListener("click", lock);
+
+    changePin.addEventListener("click", () => {
+      const current = prompt("Enter your current PIN:");
+      if (current === null) return;
+      hashPin(current).then((currentHash) => {
+        if (currentHash !== localStorage.getItem(PIN_KEY)) {
+          alert("Incorrect current PIN.");
+          return;
+        }
+        const replacement = prompt("Enter a new PIN (at least 4 characters):");
+        if (replacement === null) return;
+        if (replacement.length < 4) {
+          alert("The new PIN must contain at least 4 characters.");
+          return;
+        }
+        hashPin(replacement).then((newHash) => {
+          localStorage.setItem(PIN_KEY, newHash);
+          alert("PIN changed successfully.");
+        });
+      });
+    });
+
+    function showSavedKey(key) {
+      savedKeyText.textContent = key;
+      savedKeyPanel.classList.add("visible");
+    }
+
+    const savedKey = localStorage.getItem(STORAGE_KEY);
+    if (savedKey) {
+      input.value = savedKey;
+      status.textContent = "A saved key was loaded from this browser.";
+      showSavedKey(savedKey);
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const key = input.value.trim();
+      if (!key) return;
+      localStorage.setItem(STORAGE_KEY, key);
+      input.value = key;
+      status.textContent = "API key saved locally.";
+      showSavedKey(key);
+    });
+
+    toggle.addEventListener("click", () => {
+      const hidden = input.type === "password";
+      input.type = hidden ? "text" : "password";
+      toggle.textContent = hidden ? "Hide" : "Show";
+      toggle.setAttribute("aria-label", `${hidden ? "Hide" : "Show"} API key`);
+    });
+
+    remove.addEventListener("click", () => {
+      localStorage.removeItem(STORAGE_KEY);
+      input.value = "";
+      savedKeyText.textContent = "";
+      savedKeyPanel.classList.remove("visible");
+      input.type = "password";
+      toggle.textContent = "Show";
+      toggle.setAttribute("aria-label", "Show API key");
+      status.textContent = "Saved API key removed.";
+      input.focus();
+    });
+
+    configurePinGate();
+  </script>
+</body>
+</html>
